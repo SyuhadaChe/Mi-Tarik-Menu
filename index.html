@@ -1,118 +1,108 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Mi Tarik Station Menu</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mi Tarik Station - Menu</title>
   <style>
-    body { font-family: Arial; padding: 20px; }
-    .menu-item { margin-bottom: 10px; }
-    .cart { border-top: 1px solid #ccc; margin-top: 20px; padding-top: 10px; }
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: auto;
+      background: #f8f8f8;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    form {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    }
+
+    label {
+      display: block;
+      margin: 10px 0;
+    }
+
+    input, select, button {
+      padding: 8px;
+      width: 100%;
+      margin-top: 5px;
+    }
+
+    button {
+      margin-top: 20px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+
+    button:hover {
+      background: #45a049;
+    }
   </style>
 </head>
 <body>
+  <h1>Mi Tarik Menu</h1>
+  <form id="orderForm">
+    <label>
+      Name:
+      <input type="text" id="name" required>
+    </label>
 
-  <h2>📋 Mi Tarik Station Menu</h2>
+    <label>
+      Order Type:
+      <select id="orderType">
+        <option>Online Order</option>
+        <option>Takeaway</option>
+        <option>Dine In</option>
+      </select>
+    </label>
 
-  <div id="menu"></div>
+    <label><input type="checkbox" name="item" value="braised beef ramen|22"> Braised Beef Ramen (RM22)</label>
+    <label><input type="checkbox" name="item" value="beef ramen|16"> Beef Ramen (RM16)</label>
+    <label><input type="checkbox" name="item" value="fried dumpling|12"> Fried Dumpling (RM12)</label>
 
-  <div class="cart">
-    <h3>Your Cart</h3>
-    <ul id="cartList"></ul>
-    <p>Total: RM<span id="total">0.00</span></p>
-    <button onclick="placeOrder()">Place Order</button>
-  </div>
+    <button type="submit">Submit Order</button>
+  </form>
 
   <script>
-    const items = [
-      { id: 1, name: "Braised Beef Ramen", price: 22.00 },
-      { id: 2, name: "Beef Ramen", price: 16.00 },
-      { id: 3, name: "Fried Dumpling", price: 12.00 }
-    ];
+    function submitOrder(event) {
+      event.preventDefault();
 
-    const cart = [];
-
-    function renderMenu() {
-      const menuDiv = document.getElementById("menu");
-      items.forEach(item => {
-        const div = document.createElement("div");
-        div.className = "menu-item";
-        div.innerHTML = `${item.name} - RM${item.price.toFixed(2)} 
-          <button onclick='addToCart(${JSON.stringify(JSON.stringify(item))})'>Add to Cart</button>`;
-        menuDiv.appendChild(div);
+      const name = document.getElementById("name").value;
+      const type = document.getElementById("orderType").value;
+      const items = [...document.querySelectorAll("input[name='item']:checked")].map(e => {
+        const [itemName, itemPrice] = e.value.split("|");
+        return { name: itemName, price: parseFloat(itemPrice) };
       });
-    }
 
-    function addToCart(itemJson) {
-      const item = JSON.parse(itemJson);
-      cart.push(item);
-      updateCart();
-    }
-
-    function updateCart() {
-      const list = document.getElementById("cartList");
-      const totalSpan = document.getElementById("total");
-      list.innerHTML = "";
-      let total = 0;
-      cart.forEach(item => {
-        const li = document.createElement("li");
-        li.textContent = `${item.name} - RM${item.price.toFixed(2)}`;
-        list.appendChild(li);
-        total += item.price;
-      });
-      totalSpan.textContent = total.toFixed(2);
-    }
-
-    function placeOrder() {
-      if (cart.length === 0) {
-        alert("Cart is empty!");
+      if (items.length === 0) {
+        alert("Please select at least one menu item.");
         return;
       }
-      alert("Order placed! Total: RM" + document.getElementById("total").textContent);
-      cart.length = 0;
-      updateCart();
+
+      const total = items.reduce((sum, item) => sum + item.price, 0);
+
+      fetch("http://localhost:5000/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, type, items, total })
+      })
+        .then(res => res.json())
+        .then(data => alert(data.message || "Order submitted!"))
+        .catch(err => alert("Failed to submit order."));
     }
 
-    renderMenu();
+    document.getElementById("orderForm").addEventListener("submit", submitOrder);
   </script>
-
 </body>
 </html>
-<script>
-  function submitOrder(event) {
-    event.preventDefault();
-
-    const name = document.getElementById("name").value;
-    const type = document.getElementById("orderType").value;
-    const items = [...document.querySelectorAll("input[name='item']:checked")].map(e => {
-      const [name, price] = e.value.split("|");
-      return { name, price: parseFloat(price) };
-    });
-
-    const total = items.reduce((sum, item) => sum + item.price, 0);
-
-    fetch("http://localhost:5000/order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, type, items, total })
-    }).then(res => res.json())
-      .then(data => alert(data.message))
-      .catch(err => alert("Failed to submit order."));
-  }
-
-  document.getElementById("orderForm").addEventListener("submit", submitOrder);
-</script>
-<form id="orderForm">
-  Name: <input id="name" required><br>
-  Order Type:
-  <select id="orderType">
-    <option>Online Order</option>
-    <option>Takeaway</option>
-    <option>Dine In</option>
-  </select><br>
-
-  Menu:<br>
-  <label><input type="checkbox" name="item" value="braised beef ramen|22"> Braised Beef Ramen (RM22)</label><br>
-  <label><input type="checkbox" name="item" value="beef ramen|16"> Beef Ramen (RM16)</label><br>
-  <label><input type="checkbox" name="item" value="fried dumpling|12"> Fried Dumpling (RM12)</label><br>
-
-  <button type="submit">Submit Order</button>
-</form>
