@@ -1,47 +1,78 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mi Tarik Station Menu</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      background-color: #fff8f0;
-    }
-    h1 {
-      color: #c0392b;
-    }
-    .menu-item {
-      margin: 15px auto;
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      width: 80%;
-      max-width: 400px;
-      background: #fefefe;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .price {
-      color: #27ae60;
-      font-weight: bold;
-    }
+    body { font-family: Arial; padding: 20px; }
+    .menu-item { margin-bottom: 10px; }
+    .cart { border-top: 1px solid #ccc; margin-top: 20px; padding-top: 10px; }
   </style>
 </head>
 <body>
-  <h1>Mi Tarik Station Menu</h1>
-  <div class="menu-item">
-    <h2>Braised Beef Ramen</h2>
-    <p class="price">RM 22.00</p>
+
+  <h2>📋 Mi Tarik Station Menu</h2>
+
+  <div id="menu"></div>
+
+  <div class="cart">
+    <h3>Your Cart</h3>
+    <ul id="cartList"></ul>
+    <p>Total: RM<span id="total">0.00</span></p>
+    <button onclick="placeOrder()">Place Order</button>
   </div>
-  <div class="menu-item">
-    <h2>Beef Ramen</h2>
-    <p class="price">RM 16.00</p>
-  </div>
-  <div class="menu-item">
-    <h2>Fried Dumpling</h2>
-    <p class="price">RM 12.00</p>
-  </div>
+
+  <script>
+    const items = [
+      { id: 1, name: "Braised Beef Ramen", price: 22.00 },
+      { id: 2, name: "Beef Ramen", price: 16.00 },
+      { id: 3, name: "Fried Dumpling", price: 12.00 }
+    ];
+
+    const cart = [];
+
+    function renderMenu() {
+      const menuDiv = document.getElementById("menu");
+      items.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "menu-item";
+        div.innerHTML = `${item.name} - RM${item.price.toFixed(2)} 
+          <button onclick='addToCart(${JSON.stringify(JSON.stringify(item))})'>Add to Cart</button>`;
+        menuDiv.appendChild(div);
+      });
+    }
+
+    function addToCart(itemJson) {
+      const item = JSON.parse(itemJson);
+      cart.push(item);
+      updateCart();
+    }
+
+    function updateCart() {
+      const list = document.getElementById("cartList");
+      const totalSpan = document.getElementById("total");
+      list.innerHTML = "";
+      let total = 0;
+      cart.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = `${item.name} - RM${item.price.toFixed(2)}`;
+        list.appendChild(li);
+        total += item.price;
+      });
+      totalSpan.textContent = total.toFixed(2);
+    }
+
+    function placeOrder() {
+      if (cart.length === 0) {
+        alert("Cart is empty!");
+        return;
+      }
+      alert("Order placed! Total: RM" + document.getElementById("total").textContent);
+      cart.length = 0;
+      updateCart();
+    }
+
+    renderMenu();
+  </script>
+
 </body>
 </html>
