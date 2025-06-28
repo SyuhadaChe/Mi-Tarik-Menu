@@ -76,3 +76,43 @@
 
 </body>
 </html>
+<script>
+  function submitOrder(event) {
+    event.preventDefault();
+
+    const name = document.getElementById("name").value;
+    const type = document.getElementById("orderType").value;
+    const items = [...document.querySelectorAll("input[name='item']:checked")].map(e => {
+      const [name, price] = e.value.split("|");
+      return { name, price: parseFloat(price) };
+    });
+
+    const total = items.reduce((sum, item) => sum + item.price, 0);
+
+    fetch("http://localhost:5000/order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, type, items, total })
+    }).then(res => res.json())
+      .then(data => alert(data.message))
+      .catch(err => alert("Failed to submit order."));
+  }
+
+  document.getElementById("orderForm").addEventListener("submit", submitOrder);
+</script>
+<form id="orderForm">
+  Name: <input id="name" required><br>
+  Order Type:
+  <select id="orderType">
+    <option>Online Order</option>
+    <option>Takeaway</option>
+    <option>Dine In</option>
+  </select><br>
+
+  Menu:<br>
+  <label><input type="checkbox" name="item" value="braised beef ramen|22"> Braised Beef Ramen (RM22)</label><br>
+  <label><input type="checkbox" name="item" value="beef ramen|16"> Beef Ramen (RM16)</label><br>
+  <label><input type="checkbox" name="item" value="fried dumpling|12"> Fried Dumpling (RM12)</label><br>
+
+  <button type="submit">Submit Order</button>
+</form>
