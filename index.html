@@ -1,108 +1,77 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mi Tarik Station - Menu</title>
+  <meta charset="UTF-8">
+  <title>Mi Tarik Station Menu</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: auto;
-      background: #f8f8f8;
-      padding: 20px;
-    }
-
-    h1 {
-      text-align: center;
-      color: #333;
-    }
-
-    form {
-      background: #fff;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 0 8px rgba(0,0,0,0.1);
-    }
-
-    label {
-      display: block;
-      margin: 10px 0;
-    }
-
-    input, select, button {
-      padding: 8px;
-      width: 100%;
-      margin-top: 5px;
-    }
-
-    button {
-      margin-top: 20px;
-      background: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      font-size: 16px;
-    }
-
-    button:hover {
-      background: #45a049;
-    }
+    body { font-family: Arial; padding: 20px; }
+    button { margin-top: 10px; }
   </style>
 </head>
 <body>
-  <h1>Mi Tarik Menu</h1>
+  <h1>Mi Tarik Station Menu</h1>
   <form id="orderForm">
-    <label>
-      Name:
-      <input type="text" id="name" required>
-    </label>
-
-    <label>
-      Order Type:
-      <select id="orderType">
+    <label>Name: <input type="text" id="name" required></label><br><br>
+    <label>Order Type:
+      <select id="type">
         <option>Online Order</option>
         <option>Takeaway</option>
         <option>Dine In</option>
       </select>
-    </label>
+    </label><br><br>
 
-    <label><input type="checkbox" name="item" value="braised beef ramen|22"> Braised Beef Ramen (RM22)</label>
-    <label><input type="checkbox" name="item" value="beef ramen|16"> Beef Ramen (RM16)</label>
-    <label><input type="checkbox" name="item" value="fried dumpling|12"> Fried Dumpling (RM12)</label>
+    <h3>Select Items:</h3>
+    <label><input type="checkbox" value="braised beef ramen" data-price="22"> Braised Beef Ramen - RM22.00</label><br>
+    <label><input type="checkbox" value="beef ramen" data-price="16"> Beef Ramen - RM16.00</label><br>
+    <label><input type="checkbox" value="fried dumpling" data-price="12"> Fried Dumpling - RM12.00</label><br><br>
 
     <button type="submit">Submit Order</button>
   </form>
 
-  <script>
-    function submitOrder(event) {
-      event.preventDefault();
+  <div id="result"></div>
 
-      const name = document.getElementById("name").value;
-      const type = document.getElementById("orderType").value;
-      const items = [...document.querySelectorAll("input[name='item']:checked")].map(e => {
-        const [itemName, itemPrice] = e.value.split("|");
-        return { name: itemName, price: parseFloat(itemPrice) };
+  <script>
+    document.getElementById("orderForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const name = document.getElementById("name").value.trim();
+      const type = document.getElementById("type").value;
+
+      const checkboxes = document.querySelectorAll("input[type='checkbox']:checked");
+      const items = [];
+      let total = 0;
+      checkboxes.forEach(cb => {
+        const price = parseFloat(cb.dataset.price);
+        items.push({ name: cb.value, price });
+        total += price;
       });
 
       if (items.length === 0) {
-        alert("Please select at least one menu item.");
+        alert("Please select at least one item.");
         return;
       }
 
-      const total = items.reduce((sum, item) => sum + item.price, 0);
+      const order = { name, type, items, total };
 
-      fetch("http://localhost:5000/order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, type, items, total })
-      })
-        .then(res => res.json())
-        .then(data => alert(data.message || "Order submitted!"))
-        .catch(err => alert("Failed to submit order."));
-    }
+      try {
+        const res = await fetch("https://mi-tarik-server.onrender.com/order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(order)
+        });
 
-    document.getElementById("orderForm").addEventListener("submit", submitOrder);
+        const result = document.getElementById("result");
+
+        if (res.ok) {
+          result.innerHTML = "<p style='color: green;'>Order submitted successfully!</p>";
+        } else {
+          const errorText = await res.text();
+          result.innerHTML = `<p style='color: red;'>Server error: ${res.status} - ${errorText}</p>`;
+        }
+      } catch (err) {
+        document.getElementById("result").innerHTML = "<p style='color: red;'>Failed to connect to server.</p>";
+        console.error(err);
+      }
+    });
   </script>
 </body>
 </html>
