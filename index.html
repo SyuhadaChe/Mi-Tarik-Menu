@@ -1,124 +1,172 @@
- 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Mi Tarik Menu</title>
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 20px;
-    }
-    .menu-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 20px;
-    }
-    .item-card {
-      border: 1px solid #ccc;
-      padding: 15px;
-      border-radius: 10px;
-      text-align: center;
-    }
-    .item-card img {
-      width: 150px;
-      height: 150px;
-      object-fit: cover;
-    }
-    #cart {
-      margin-top: 30px;
-    }
+    body { font-family: Arial; padding: 20px; background: #fefefe; }
+    h1, h2 { color: #6b240c; }
+    .menu { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+    .item, .order-card { border: 1px solid #ccc; border-radius: 8px; padding: 10px; background: #fff; }
+    .item img { width: 100%; border-radius: 8px; }
+    .cart { margin-top: 20px; border-top: 2px solid #6b240c; padding-top: 10px; }
+    .admin, .admin-panel, .orders { margin-top: 40px; border-top: 2px dashed #999; padding-top: 20px; }
+    button { background: #6b240c; color: white; border: none; padding: 8px 16px; cursor: pointer; border-radius: 4px; }
+    input, select { padding: 6px; margin: 4px; }
   </style>
 </head>
 <body>
-  <h1>🍜 Mi Tarik Station Menu</h1>
-  <div class="menu-grid" id="menuContainer"></div>
+  <h1>🍜 Mi Tarik Menu</h1>
+  <div id="menu" class="menu"></div>
 
-  <div id="cart">
-    <h2>🛒 Cart</h2>
-    <ul id="cartList"></ul>
-    <p><strong>Total: RM</strong> <span id="totalPrice">0.00</span></p>
+  <div class="cart">
+    <h2>Your Cart</h2>
+    <ul id="cart-list"></ul>
+    <p>Total: RM <span id="total">0.00</span></p>
     <button onclick="submitOrder()">Place Order</button>
   </div>
 
-  <script>
-    const apiUrl = "https://mi-tarik-server.onrender.com";
-    const cart = [];
+  <div class="admin">
+    <h2>🔐 Admin Login</h2>
+    <input type="password" id="admin-password" placeholder="Enter password" />
+    <button onclick="checkAdmin()">Login</button>
+  </div>
 
-    function addToCart(item) {
-      cart.push(item);
-      renderCart();
-    }
+  <div class="admin-panel" id="admin-panel" style="display: none;">
+    <h2>🧑‍🍳 Admin Panel</h2>
+    <p><b>Add New Menu Item:</b></p>
+    <input id="new-name" placeholder="Name" />
+    <input id="new-price" placeholder="Price" type="number" />
+    <input id="new-img" placeholder="Image URL" />
+    <button onclick="addMenuItem()">Add Item</button>
 
-    function renderCart() {
-      const cartList = document.getElementById("cartList");
-      cartList.innerHTML = "";
-      let total = 0;
-      cart.forEach(item => {
-        const li = document.createElement("li");
-        li.textContent = `${item.name} - RM${item.price.toFixed(2)}`;
-        cartList.appendChild(li);
-        total += item.price;
+    <div class="orders">
+      <h2>📦 Orders</h2>
+      <div id="orders-list"></div>
+    </div>
+  </div>
+
+<script>
+const api = 'https://mi-tarik-server.onrender.com';
+let cart = [];
+
+function fetchMenu() {
+  fetch(`${api}/menu`)
+    .then(res => res.json())
+    .then(data => {
+      const menuDiv = document.getElementById('menu');
+      menuDiv.innerHTML = '';
+      data.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'item';
+        card.innerHTML = `
+          <img src="${item.image_url}" alt="${item.name}" />
+          <h3>${item.name}</h3>
+          <p>RM ${item.price.toFixed(2)}</p>
+          <button onclick='addToCart(${JSON.stringify(item)})'>Add to Cart</button>
+        `;
+        menuDiv.appendChild(card);
       });
-      document.getElementById("totalPrice").textContent = total.toFixed(2);
-    }
+    }).catch(err => alert('❌ Failed to load menu'));
+}
 
-    function submitOrder() {
-      if (cart.length === 0) {
-        alert("Cart is empty!");
-        return;
-      }
+function addToCart(item) {
+  cart.push(item);
+  updateCart();
+}
 
-      const order = {
-        name: "Guest",
-        type: "Website Order",
-        items: cart,
-        total: cart.reduce((sum, i) => sum + i.price, 0),
-        payment: "Website"
+function updateCart() {
+  const list = document.getElementById('cart-list');
+  const total = document.getElementById('total');
+  list.innerHTML = '';
+  let sum = 0;
+  cart.forEach(item => {
+    list.innerHTML += `<li>${item.name} - RM ${item.price.toFixed(2)}</li>`;
+    sum += item.price;
+  });
+  total.textContent = sum.toFixed(2);
+}
+
+function submitOrder() {
+  if (cart.length === 0) return alert('🛒 Your cart is empty!');
+  const name = prompt('Enter your name:');
+  if (!name) return;
+  fetch(`${api}/order`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      name: name,
+      type: 'Website',
+      items: cart,
+      total: cart.reduce((s, i) => s + i.price, 0)
+    })
+  })
+  .then(res => res.json())
+  .then(res => {
+    alert('✅ Order placed!');
+    cart = [];
+    updateCart();
+  }).catch(err => alert('❌ Failed to submit order.'));
+}
+
+function checkAdmin() {
+  const pw = document.getElementById('admin-password').value;
+  if (pw === 'admin123') {
+    document.getElementById('admin-panel').style.display = 'block';
+    fetchOrders();
+  } else {
+    alert('Wrong password');
+  }
+}
+
+function fetchOrders() {
+  fetch(`${api}/orders`)
+    .then(res => res.json())
+    .then(data => {
+      const ol = document.getElementById('orders-list');
+      ol.innerHTML = '';
+      data.forEach((o, i) => {
+        const card = document.createElement('div');
+        card.className = 'order-card';
+        card.innerHTML = `
+          <h4>Order ${i + 1} - ${o.name} (${o.type})</h4>
+          <ul>${o.items.map(it => `<li>${it.name} - RM ${it.price.toFixed(2)}</li>`).join('')}</ul>
+          <p><b>Total:</b> RM ${o.total.toFixed(2)}</p>
+        `;
+        ol.appendChild(card);
+      });
+    });
+}
+
+function addMenuItem() {
+  const name = document.getElementById('new-name').value;
+  const price = parseFloat(document.getElementById('new-price').value);
+  const image_url = document.getElementById('new-img').value;
+  if (!name || isNaN(price) || !image_url) return alert('Please fill all fields');
+
+  fetch(`${api}/menu`)
+    .then(res => res.json())
+    .then(menu => {
+      const newItem = {
+        id: menu.length + 1,
+        name, price, image_url
       };
-
-      fetch(`${apiUrl}/order`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(order)
-      })
-      .then(res => res.json())
-      .then(data => {
-        alert("✅ Order submitted!");
-        cart.length = 0;
-        renderCart();
-      })
-      .catch(err => {
-        alert("❌ Failed to submit order.");
-        console.error(err);
+      return fetch(`${api}/menu`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(newItem)
       });
-    }
+    })
+    .then(res => res.json())
+    .then(() => {
+      alert('✅ Menu item added!');
+      fetchMenu();
+    })
+    .catch(err => alert('❌ Failed to add item.'));
+}
 
-    function loadMenu() {
-      fetch(`${apiUrl}/menu`)
-        .then(res => res.json())
-        .then(data => {
-          const container = document.getElementById("menuContainer");
-          data.forEach(item => {
-            const card = document.createElement("div");
-            card.className = "item-card";
-            card.innerHTML = `
-              <img src="${item.image_url}" alt="${item.name}" />
-              <h3>${item.name}</h3>
-              <p>RM${item.price.toFixed(2)}</p>
-              <button onclick='addToCart(${JSON.stringify(item)})'>Add to Cart</button>
-            `;
-            container.appendChild(card);
-          });
-        })
-        .catch(err => {
-          console.error("Failed to load menu:", err);
-        });
-    }
-
-    loadMenu();
-  </script>
+fetchMenu();
+</script>
 </body>
 </html>
