@@ -1,3 +1,4 @@
+ 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,168 +6,119 @@
   <title>Mi Tarik Menu</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      text-align: center;
+      font-family: sans-serif;
       padding: 20px;
-      background: #fefefe;
     }
-    h1 {
-      color: #333;
-    }
-    .menu-container {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
     }
     .item-card {
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      margin: 15px;
+      border: 1px solid #ccc;
       padding: 15px;
-      width: 200px;
-      background-color: #fff;
-      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+      border-radius: 10px;
+      text-align: center;
     }
     .item-card img {
-      width: 100%;
-      height: 130px;
+      width: 150px;
+      height: 150px;
       object-fit: cover;
-      border-radius: 6px;
-    }
-    .item-card h3 {
-      margin: 10px 0 5px;
-    }
-    .item-card p {
-      margin: 5px 0;
-    }
-    .item-card button {
-      background-color: #f58220;
-      color: white;
-      border: none;
-      padding: 8px 12px;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    .item-card button:hover {
-      background-color: #d06c1a;
     }
     #cart {
       margin-top: 30px;
-    }
-    #cart-items {
-      margin-top: 10px;
-    }
-    #submit-order {
-      margin-top: 15px;
-      padding: 10px 20px;
-      font-size: 16px;
-      background-color: green;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
     }
   </style>
 </head>
 <body>
   <h1>🍜 Mi Tarik Station Menu</h1>
-  <div class="menu-container" id="menu-container"></div>
+  <div class="menu-grid" id="menuContainer"></div>
 
   <div id="cart">
-    <h2>Your Cart</h2>
-    <div id="cart-items"></div>
-    <button id="submit-order">Submit Order</button>
+    <h2>🛒 Cart</h2>
+    <ul id="cartList"></ul>
+    <p><strong>Total: RM</strong> <span id="totalPrice">0.00</span></p>
+    <button onclick="submitOrder()">Place Order</button>
   </div>
 
   <script>
-    const menuContainer = document.getElementById("menu-container");
-    const cartItems = document.getElementById("cart-items");
-    const submitButton = document.getElementById("submit-order");
-    let cart = [];
+    const apiUrl = "https://mi-tarik-server.onrender.com";
+    const cart = [];
 
-    // Load menu from backend
-    fetch("https://mi-tarik-server.onrender.com/menu")
-      .then(res => res.json())
-      .then(data => {
-        data.forEach(item => {
-          const card = document.createElement("div");
-          card.className = "item-card";
-
-          if (item.image_url) {
-            const img = document.createElement("img");
-            img.src = item.image_url;
-            img.alt = item.name;
-            card.appendChild(img);
-          }
-
-          const name = document.createElement("h3");
-          name.innerText = item.name;
-          card.appendChild(name);
-
-          const price = document.createElement("p");
-          price.innerText = `RM${item.price.toFixed(2)}`;
-          card.appendChild(price);
-
-          const addBtn = document.createElement("button");
-          addBtn.innerText = "Add to Cart";
-          addBtn.onclick = () => {
-            cart.push(item);
-            updateCart();
-          };
-          card.appendChild(addBtn);
-
-          menuContainer.appendChild(card);
-        });
-      });
-
-    function updateCart() {
-      cartItems.innerHTML = "";
-      let total = 0;
-      cart.forEach(item => {
-        const p = document.createElement("p");
-        p.innerText = `- ${item.name} - RM${item.price.toFixed(2)}`;
-        cartItems.appendChild(p);
-        total += item.price;
-      });
-      const totalP = document.createElement("p");
-      totalP.innerHTML = `<strong>Total: RM${total.toFixed(2)}</strong>`;
-      cartItems.appendChild(totalP);
+    function addToCart(item) {
+      cart.push(item);
+      renderCart();
     }
 
-    submitButton.onclick = () => {
+    function renderCart() {
+      const cartList = document.getElementById("cartList");
+      cartList.innerHTML = "";
+      let total = 0;
+      cart.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = `${item.name} - RM${item.price.toFixed(2)}`;
+        cartList.appendChild(li);
+        total += item.price;
+      });
+      document.getElementById("totalPrice").textContent = total.toFixed(2);
+    }
+
+    function submitOrder() {
       if (cart.length === 0) {
-        alert("Your cart is empty!");
+        alert("Cart is empty!");
         return;
       }
 
-      const name = prompt("Enter your name:");
-      const order_type = prompt("Order type (Online Order / Dine In / Takeaway):");
-
-      const payload = {
-        name,
-        type: order_type,
+      const order = {
+        name: "Guest",
+        type: "Website Order",
         items: cart,
-        total: cart.reduce((acc, item) => acc + item.price, 0)
+        total: cart.reduce((sum, i) => sum + i.price, 0),
+        payment: "Website"
       };
 
-      fetch("https://mi-tarik-server.onrender.com/order", {
+      fetch(`${apiUrl}/order`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(order)
       })
-      .then(res => {
-        if (res.ok) {
-          alert("Order submitted successfully!");
-          cart = [];
-          updateCart();
-        } else {
-          alert("Failed to submit order.");
-        }
+      .then(res => res.json())
+      .then(data => {
+        alert("✅ Order submitted!");
+        cart.length = 0;
+        renderCart();
       })
       .catch(err => {
-        alert("Error submitting order: " + err.message);
+        alert("❌ Failed to submit order.");
+        console.error(err);
       });
-    };
+    }
+
+    function loadMenu() {
+      fetch(`${apiUrl}/menu`)
+        .then(res => res.json())
+        .then(data => {
+          const container = document.getElementById("menuContainer");
+          data.forEach(item => {
+            const card = document.createElement("div");
+            card.className = "item-card";
+            card.innerHTML = `
+              <img src="${item.image_url}" alt="${item.name}" />
+              <h3>${item.name}</h3>
+              <p>RM${item.price.toFixed(2)}</p>
+              <button onclick='addToCart(${JSON.stringify(item)})'>Add to Cart</button>
+            `;
+            container.appendChild(card);
+          });
+        })
+        .catch(err => {
+          console.error("Failed to load menu:", err);
+        });
+    }
+
+    loadMenu();
   </script>
 </body>
 </html>
