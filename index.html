@@ -1,134 +1,82 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Mi Tarik Station</title>
-  <style>
-    body { font-family: Arial; margin: 20px; }
-    .item { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; display: flex; align-items: center; }
-    .item img { width: 100px; height: 100px; margin-right: 10px; }
-    .item-name { font-weight: bold; }
-    .item-price { margin-left: auto; }
-    #fpx-fields { display: none; margin-top: 10px; }
-  </style>
-</head>
-<body>
-  <h1>Welcome to Mi Tarik Station</h1>
-  <div id="menu-container"></div>
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import json
+import os
 
-  <h2>Your Details</h2>
-  <label>Name: <input type="text" id="customer-name" required></label><br>
-  <label>Order Type:
-    <select id="order-type">
-      <option value="Dine-In">Dine-In</option>
-      <option value="Takeaway">Takeaway</option>
-      <option value="Online">Online</option>
-    </select>
-  </label><br><br>
+app = Flask(__name__)
+CORS(app)
 
-  <h3>Payment Method</h3>
-  <select id="payment-method" onchange="toggleFPXFields()">
-    <option value="cash">Cash</option>
-    <option value="fpx">FPX Online Banking</option>
-  </select>
+MENU_FILE = "menu.json"
+ORDERS_FILE = "website_order.json"
 
-  <div id="fpx-fields">
-    <label>Bank Type: <input type="text" id="bank"></label><br>
-    <label>Username: <input type="text" id="fpx-username"></label><br>
-    <label>Password: <input type="password" id="fpx-password"></label><br>
-  </div>
 
-  <button onclick="submitOrder()">Submit Order</button>
+def load_data(file):
+    if os.path.exists(file):
+        with open(file, 'r') as f:
+            return json.load(f)
+    return []
 
-  <script>
-    const MENU_URL = "https://mi-tarik-server.onrender.com/menu";
-    const ORDER_URL = "https://mi-tarik-server.onrender.com/order";
-    let menuItems = [];
 
-    async function loadMenu() {
-      try {
-        const res = await fetch(MENU_URL);
-        menuItems = await res.json();
-        const container = document.getElementById("menu-container");
-        container.innerHTML = "";
-        menuItems.forEach((item, index) => {
-          const div = document.createElement("div");
-          div.className = "item";
-          div.innerHTML = `
-            <img src="${item.image_url}" alt="${item.name}">
-            <span class="item-name">${item.name}</span>
-            <span class="item-price">RM ${item.price.toFixed(2)}</span>
-            <input type="checkbox" id="item-${index}" style="margin-left:10px;">
-          `;
-          container.appendChild(div);
-        });
-      } catch (err) {
-        alert("Failed to load menu.");
-      }
-    }
+def save_data(file, data):
+    with open(file, 'w') as f:
+        json.dump(data, f, indent=2)
 
-    function toggleFPXFields() {
-      const method = document.getElementById("payment-method").value;
-      document.getElementById("fpx-fields").style.display = method === "fpx" ? "block" : "none";
-    }
 
-    async function submitOrder() {
-      const name = document.getElementById("customer-name").value.trim();
-      const type = document.getElementById("order-type").value;
-      const method = document.getElementById("payment-method").value;
+@app.route('/')
+def home():
+    return "Mi Tarik Server is running"
 
-      if (!name) return alert("Please enter your name.");
 
-      const selectedItems = [];
-      let total = 0;
+@app.route('/menu', methods=['GET'])
+def get_menu():
+    return jsonify(load_data(MENU_FILE))
 
-      menuItems.forEach((item, index) => {
-        const checkbox = document.getElementById(`item-${index}`);
-        if (checkbox && checkbox.checked) {
-          selectedItems.push(item);
-          total += item.price;
-        }
-      });
 
-      if (selectedItems.length === 0) return alert("Please select at least one item.");
+@app.route('/menu', methods=['POST'])
+def add_menu():
+    menu = load_data(MENU_FILE)
+    item = request.json
+    menu.append(item)
+    save_data(MENU_FILE, menu)
+    return jsonify({"status": "success"})
 
-      const payment = { method };
-      if (method === "fpx") {
-        payment.bank = document.getElementById("bank").value.trim();
-        payment.username = document.getElementById("fpx-username").value.trim();
-        payment.password = document.getElementById("fpx-password").value.trim();
-        if (!payment.bank || !payment.username || !payment.password)
-          return alert("Please fill all FPX payment details.");
-      }
 
-      const order = {
-        name,
-        type,
-        items: selectedItems,
-        total,
-        payment
-      };
+@app.route('/menu/delete', methods=['POST'])
+def delete_menu():
+    menu = load_data(MENU_FILE)
+    data = request.json
+    item_id = data.get("id")
+    updated_menu = [item for item in menu if item.get("id") != item_id]
+    save_data(MENU_FILE, updated_menu)
+    return jsonify({"status": "deleted"})
 
-      try {
-        const res = await fetch(ORDER_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(order)
-        });
 
-        if (res.ok) {
-          alert("Order submitted successfully!");
-          window.location.reload();
-        } else {
-          alert("Failed to submit order.");
-        }
-      } catch (err) {
-        alert("Error submitting order: " + err);
-      }
-    }
+@app.route('/order', methods=['POST'])
+def place_order():
+    orders = load_data(ORDERS_FILE)
+    order = request.json
 
-    loadMenu();
-  </script>
-</body>
-</html>
+    if 'payment' not in order:
+        order['payment'] = {"method": "unknown"}
+    else:
+        payment = order['payment']
+        payment.setdefault("method", "unknown")
+        if payment['method'].lower() == "fpx":
+            payment.setdefault("bank", "")
+            payment.setdefault("username", "")
+            payment.setdefault("password", "")
+
+    orders.append(order)
+    save_data(ORDERS_FILE, orders)
+    return jsonify({"status": "received"})
+
+
+@app.route('/orders', methods=['GET'])
+def get_orders():
+    return jsonify(load_data(ORDERS_FILE))
+
+
+if __name__ == '__main__':
+    app.run(debug=False, port=5000)
+
+    
