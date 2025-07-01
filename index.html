@@ -1,82 +1,177 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import json
-import os
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mi Tarik Online Menu</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f3f3f3;
+    }
+    h1 {
+      text-align: center;
+      color: #a52a2a;
+    }
+    .menu {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .item {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 10px;
+      margin: 10px;
+      width: 200px;
+      background-color: #fff;
+      text-align: center;
+    }
+    img {
+      width: 150px;
+      height: 150px;
+      object-fit: cover;
+    }
+    .cart, .payment {
+      margin-top: 30px;
+      background-color: #fff;
+      padding: 15px;
+      border-radius: 8px;
+    }
+    button {
+      background-color: #a52a2a;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      margin: 5px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #7b1f1f;
+    }
+  </style>
+</head>
+<body>
+  <h1>Welcome to Mi Tarik</h1>
+  <div class="menu" id="menu"></div>
 
-app = Flask(__name__)
-CORS(app)
+  <div class="cart" id="cart">
+    <h3>Your Cart</h3>
+    <ul id="cartList"></ul>
+    <p><strong>Total:</strong> RM <span id="totalPrice">0.00</span></p>
+    <label>Order Type:
+      <select id="orderType">
+        <option value="Dine-In">Dine-In</option>
+        <option value="Takeaway">Takeaway</option>
+      </select>
+    </label>
+    <br><br>
+    <label>Your Name: <input type="text" id="customerName" /></label>
+    <br><br>
+    <label>Payment Type:
+      <select id="paymentType">
+        <option value="Cash">Cash</option>
+        <option value="FPX">FPX Online</option>
+      </select>
+    </label>
+    <div id="fpxDetails" style="display: none;">
+      <label>Bank: <input type="text" id="bankName" /></label><br>
+      <label>Username: <input type="text" id="bankUser" /></label><br>
+      <label>Password: <input type="password" id="bankPass" /></label>
+    </div>
+    <br>
+    <button onclick="submitOrder()">Submit Order</button>
+  </div>
 
-MENU_FILE = "menu.json"
-ORDERS_FILE = "website_order.json"
+  <script>
+    let menu = [];
+    let cart = [];
 
+    fetch("https://mi-tarik-server.onrender.com/menu")
+      .then(res => res.json())
+      .then(data => {
+        menu = data;
+        const menuDiv = document.getElementById("menu");
+        data.forEach(item => {
+          const div = document.createElement("div");
+          div.className = "item";
+          div.innerHTML = `
+            <img src="${item.image_url}" alt="${item.name}" />
+            <h4>${item.name}</h4>
+            <p>RM ${item.price.toFixed(2)}</p>
+            <button onclick='addToCart(${JSON.stringify(item)})'>Add</button>
+          `;
+          menuDiv.appendChild(div);
+        });
+      });
 
-def load_data(file):
-    if os.path.exists(file):
-        with open(file, 'r') as f:
-            return json.load(f)
-    return []
+    function addToCart(item) {
+      cart.push(item);
+      updateCart();
+    }
 
+    function updateCart() {
+      const cartList = document.getElementById("cartList");
+      cartList.innerHTML = "";
+      let total = 0;
+      cart.forEach((item, i) => {
+        total += item.price;
+        const li = document.createElement("li");
+        li.textContent = `${item.name} - RM ${item.price.toFixed(2)}`;
+        const btn = document.createElement("button");
+        btn.textContent = "❌";
+        btn.onclick = () => { cart.splice(i, 1); updateCart(); };
+        li.appendChild(btn);
+        cartList.appendChild(li);
+      });
+      document.getElementById("totalPrice").textContent = total.toFixed(2);
+    }
 
-def save_data(file, data):
-    with open(file, 'w') as f:
-        json.dump(data, f, indent=2)
+    document.getElementById("paymentType").addEventListener("change", function() {
+      const fpx = document.getElementById("fpxDetails");
+      fpx.style.display = this.value === "FPX" ? "block" : "none";
+    });
 
+    function submitOrder() {
+      const name = document.getElementById("customerName").value.trim();
+      const type = document.getElementById("orderType").value;
+      const payment = document.getElementById("paymentType").value;
+      const total = parseFloat(document.getElementById("totalPrice").textContent);
+      if (!name || cart.length === 0) {
+        alert("Please enter your name and add items to cart.");
+        return;
+      }
 
-@app.route('/')
-def home():
-    return "Mi Tarik Server is running"
+      let paymentInfo = payment;
+      if (payment === "FPX") {
+        const bank = document.getElementById("bankName").value;
+        const user = document.getElementById("bankUser").value;
+        const pass = document.getElementById("bankPass").value;
+        if (!bank || !user || !pass) {
+          alert("Fill in FPX bank details.");
+          return;
+        }
+        paymentInfo = `FPX - Bank: ${bank}, User: ${user}`;
+      }
 
-
-@app.route('/menu', methods=['GET'])
-def get_menu():
-    return jsonify(load_data(MENU_FILE))
-
-
-@app.route('/menu', methods=['POST'])
-def add_menu():
-    menu = load_data(MENU_FILE)
-    item = request.json
-    menu.append(item)
-    save_data(MENU_FILE, menu)
-    return jsonify({"status": "success"})
-
-
-@app.route('/menu/delete', methods=['POST'])
-def delete_menu():
-    menu = load_data(MENU_FILE)
-    data = request.json
-    item_id = data.get("id")
-    updated_menu = [item for item in menu if item.get("id") != item_id]
-    save_data(MENU_FILE, updated_menu)
-    return jsonify({"status": "deleted"})
-
-
-@app.route('/order', methods=['POST'])
-def place_order():
-    orders = load_data(ORDERS_FILE)
-    order = request.json
-
-    if 'payment' not in order:
-        order['payment'] = {"method": "unknown"}
-    else:
-        payment = order['payment']
-        payment.setdefault("method", "unknown")
-        if payment['method'].lower() == "fpx":
-            payment.setdefault("bank", "")
-            payment.setdefault("username", "")
-            payment.setdefault("password", "")
-
-    orders.append(order)
-    save_data(ORDERS_FILE, orders)
-    return jsonify({"status": "received"})
-
-
-@app.route('/orders', methods=['GET'])
-def get_orders():
-    return jsonify(load_data(ORDERS_FILE))
-
-
-if __name__ == '__main__':
-    app.run(debug=False, port=5000)
-
-    
+      const order = { name, type, total, payment: paymentInfo, items: cart };
+      fetch("https://mi-tarik-server.onrender.com/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(order)
+      }).then(res => {
+        if (res.ok) {
+          alert("Order submitted successfully!");
+          cart = [];
+          updateCart();
+          document.getElementById("customerName").value = "";
+        } else {
+          alert("Failed to submit order.");
+        }
+      });
+    }
+  </script>
+</body>
+</html>
