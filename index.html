@@ -3,159 +3,132 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Mi Tarik Menu</title>
+  <title>Mi Tarik Station</title>
   <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 20px;
-      background: #fffaf0;
-    }
-    h1 {
-      color: #8b0000;
-    }
-    .menu-item {
-      border: 1px solid #ccc;
-      border-radius: 12px;
-      padding: 15px;
-      margin: 10px auto;
-      width: 300px;
-      background: #fff;
-    }
-    img {
-      max-width: 100%;
-      height: auto;
-      border-radius: 8px;
-    }
-    button {
-      margin: 5px;
-      padding: 8px 16px;
-      border: none;
-      background: #8b0000;
-      color: white;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #a52a2a;
-    }
-    #cart {
-      margin-top: 30px;
-    }
+    body { font-family: Arial; margin: 20px; }
+    .item { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; display: flex; align-items: center; }
+    .item img { width: 100px; height: 100px; margin-right: 10px; }
+    .item-name { font-weight: bold; }
+    .item-price { margin-left: auto; }
+    #fpx-fields { display: none; margin-top: 10px; }
   </style>
 </head>
 <body>
+  <h1>Welcome to Mi Tarik Station</h1>
+  <div id="menu-container"></div>
 
-  <h1>Welcome to Mi Tarik Station!</h1>
-  <div id="welcome">
-    <p>Would you like to start ordering?</p>
-    <button onclick="startOrdering()">Yes</button>
-    <button onclick="exitSite()">No</button>
+  <h2>Your Details</h2>
+  <label>Name: <input type="text" id="customer-name" required></label><br>
+  <label>Order Type:
+    <select id="order-type">
+      <option value="Dine-In">Dine-In</option>
+      <option value="Takeaway">Takeaway</option>
+      <option value="Online">Online</option>
+    </select>
+  </label><br><br>
+
+  <h3>Payment Method</h3>
+  <select id="payment-method" onchange="toggleFPXFields()">
+    <option value="cash">Cash</option>
+    <option value="fpx">FPX Online Banking</option>
+  </select>
+
+  <div id="fpx-fields">
+    <label>Bank Type: <input type="text" id="bank"></label><br>
+    <label>Username: <input type="text" id="fpx-username"></label><br>
+    <label>Password: <input type="password" id="fpx-password"></label><br>
   </div>
 
-  <div id="menu" style="display:none;"></div>
-
-  <div id="cart" style="display:none;">
-    <h2>Your Cart</h2>
-    <ul id="cartItems"></ul>
-    <p id="cartTotal">Total: RM0.00</p>
-    <button onclick="submitOrder()">Submit Order</button>
-  </div>
+  <button onclick="submitOrder()">Submit Order</button>
 
   <script>
-    const SERVER_URL = "https://mi-tarik-server.onrender.com";
-    const menuDiv = document.getElementById("menu");
-    const cartDiv = document.getElementById("cart");
-    const cartItemsUl = document.getElementById("cartItems");
-    const cartTotalP = document.getElementById("cartTotal");
-    let cart = [];
+    const MENU_URL = "https://mi-tarik-server.onrender.com/menu";
+    const ORDER_URL = "https://mi-tarik-server.onrender.com/order";
+    let menuItems = [];
 
-    function startOrdering() {
-      document.getElementById("welcome").style.display = "none";
-      menuDiv.style.display = "block";
-      cartDiv.style.display = "block";
-      loadMenu();
-    }
-
-    function exitSite() {
-      alert("Thank you for visiting Mi Tarik Station!");
-      window.close();
-    }
-
-    function loadMenu() {
-      fetch(`${SERVER_URL}/menu`)
-        .then(res => res.json())
-        .then(data => {
-          menuDiv.innerHTML = "";
-          data.forEach(item => {
-            const div = document.createElement("div");
-            div.className = "menu-item";
-            div.innerHTML = `
-              <img src="${item.image_url}" alt="${item.name}" />
-              <h3>${item.name}</h3>
-              <p>RM${item.price.toFixed(2)}</p>
-              <button onclick='addToCart(${JSON.stringify(item)})'>Add to Cart</button>
-            `;
-            menuDiv.appendChild(div);
-          });
-        })
-        .catch(err => {
-          menuDiv.innerHTML = `<p>Failed to load menu. ${err}</p>`;
+    async function loadMenu() {
+      try {
+        const res = await fetch(MENU_URL);
+        menuItems = await res.json();
+        const container = document.getElementById("menu-container");
+        container.innerHTML = "";
+        menuItems.forEach((item, index) => {
+          const div = document.createElement("div");
+          div.className = "item";
+          div.innerHTML = `
+            <img src="${item.image_url}" alt="${item.name}">
+            <span class="item-name">${item.name}</span>
+            <span class="item-price">RM ${item.price.toFixed(2)}</span>
+            <input type="checkbox" id="item-${index}" style="margin-left:10px;">
+          `;
+          container.appendChild(div);
         });
+      } catch (err) {
+        alert("Failed to load menu.");
+      }
     }
 
-    function addToCart(item) {
-      cart.push(item);
-      updateCart();
+    function toggleFPXFields() {
+      const method = document.getElementById("payment-method").value;
+      document.getElementById("fpx-fields").style.display = method === "fpx" ? "block" : "none";
     }
 
-    function removeFromCart(index) {
-      cart.splice(index, 1);
-      updateCart();
-    }
+    async function submitOrder() {
+      const name = document.getElementById("customer-name").value.trim();
+      const type = document.getElementById("order-type").value;
+      const method = document.getElementById("payment-method").value;
 
-    function updateCart() {
-      cartItemsUl.innerHTML = "";
+      if (!name) return alert("Please enter your name.");
+
+      const selectedItems = [];
       let total = 0;
-      cart.forEach((item, index) => {
-        total += item.price;
-        const li = document.createElement("li");
-        li.textContent = `${item.name} - RM${item.price.toFixed(2)}`;
-        const btn = document.createElement("button");
-        btn.textContent = "Remove";
-        btn.onclick = () => removeFromCart(index);
-        li.appendChild(btn);
-        cartItemsUl.appendChild(li);
+
+      menuItems.forEach((item, index) => {
+        const checkbox = document.getElementById(`item-${index}`);
+        if (checkbox && checkbox.checked) {
+          selectedItems.push(item);
+          total += item.price;
+        }
       });
-      cartTotalP.textContent = `Total: RM${total.toFixed(2)}`;
-    }
 
-    function submitOrder() {
-      if (cart.length === 0) return alert("Cart is empty!");
+      if (selectedItems.length === 0) return alert("Please select at least one item.");
 
-      const name = prompt("Enter your name:");
-      if (!name) return;
+      const payment = { method };
+      if (method === "fpx") {
+        payment.bank = document.getElementById("bank").value.trim();
+        payment.username = document.getElementById("fpx-username").value.trim();
+        payment.password = document.getElementById("fpx-password").value.trim();
+        if (!payment.bank || !payment.username || !payment.password)
+          return alert("Please fill all FPX payment details.");
+      }
 
-      const type = prompt("Order type: Dine-In, Takeaway, Online?");
-      if (!type) return;
+      const order = {
+        name,
+        type,
+        items: selectedItems,
+        total,
+        payment
+      };
 
-      const total = cart.reduce((sum, item) => sum + item.price, 0);
-
-      fetch(`${SERVER_URL}/order`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, type, items: cart, total }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          alert("Order submitted successfully!");
-          cart = [];
-          updateCart();
-        })
-        .catch(err => {
-          alert("Failed to submit order: " + err);
+      try {
+        const res = await fetch(ORDER_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(order)
         });
+
+        if (res.ok) {
+          alert("Order submitted successfully!");
+          window.location.reload();
+        } else {
+          alert("Failed to submit order.");
+        }
+      } catch (err) {
+        alert("Error submitting order: " + err);
+      }
     }
+
+    loadMenu();
   </script>
 </body>
 </html>
